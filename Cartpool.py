@@ -6,6 +6,7 @@ import random
 from numpy.random import seed
 import numpy as np
 from DQN import DQN
+from time import time
 
 param = {
     "BUFFER_SIZE": 10000,
@@ -46,27 +47,25 @@ def cartpole_NN():
     random.seed(0)
     torch.manual_seed(0)
 
-    dqn = DQN(Net, param, action_space, observation_space)
+    dqn = DQN(Net, param, action_space, [observation_space], cuda=False)
     steps = []
 
     for episode in range(10000):
         observation = env.reset()
         done = False
         steps.append(0)
+        t = time()
         for i in range(100):
             #env.render()
             action = dqn.get_action(observation)
             observation_next, reward, done, info = env.step(action)
 
-            # x, x_dot, theta, theta_dot = observation_next
-            # r1 = (env.x_threshold - abs(x)) / env.x_threshold - 0.8
-            # r2 = (env.theta_threshold_radians - abs(theta)) / env.theta_threshold_radians - 0.5
-            # reward = r1 + r2
-
             dqn.store(observation, action, observation_next, reward, done)
+
             observation = observation_next
             dqn.learn()
             steps[-1] += reward
+        print('T : ', time() - t)
         if episode %10:
             plot_evolution(steps)
     env.close()

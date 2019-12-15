@@ -6,30 +6,34 @@ from random import sample
 
 
 class DQN:
-    def __init__(self, Net, param, n_action, n_state):
-        use_cuda = torch.cuda.is_available()
+    def __init__(self, Net, param, n_action, state_shape, cuda = True):
+        use_cuda = torch.cuda.is_available() and cuda
 
         self.device = torch.device("cuda" if use_cuda else "cpu")
         # Création des NN d'éval et de target
-        self.eval_model = Net(n_action, n_state).to(self.device)
-        self.target_model = Net(n_action, n_state).to(self.device)
+        self.eval_model = Net().to(self.device)
+        self.target_model = Net().to(self.device)
         self.target_model.load_state_dict(self.eval_model.state_dict())
 
         self.param = param
 
-        self.memory = Buffer(self.param["BUFFER_SIZE"])
+        self.memory = Buffer(self.param["BUFFER_SIZE"], state_shape, self.device)
         self.optimizer = torch.optim.Adam(self.eval_model.parameters(), lr=self.param["LR"])
         self.criterion = nn.MSELoss().to(self.device)
+        self.criterion = nn.SmoothL1Loss().to(self.device)
 
+        self.n_action = n_action
         self.step_counter = 0
 
 
     def get_action(self,state):
         state = torch.FloatTensor(state).to(self.device)
 
-        Q = self.eval_model(state)
+        Q = self.eval_model(state).view([-1])
         proba = F.softmax(Q / self.param["TAU"], dim=0).detach()
-        action = choice([0, 1], p=proba.cpu().numpy().round(2))
+        proba = proba.cpu().numpy().round(2)
+        proba /= proba.sum()
+        action = choice([k for k in range(self.n_action)], p=proba)
 
         return action
 
@@ -45,44 +49,49 @@ class DQN:
         if self.step_counter % self.param["UPDATE_MODEL_STEP"] == 0:
             self.target_model.load_state_dict(self.eval_model.state_dict())
 
+        state, action, next_state, reward, done = self.memory.get_batch(self.param["BATCH_SIZE"])
 
-        batch = self.memory.get_batch(self.param["BATCH_SIZE"])
-        state, action, next_state, reward, done = [], [], [], [], []
-        for b in batch:
-            state.append(b[0])
-            action.append(b[1])
-            next_state.append(b[2])
-            reward.append(b[3])
-            done.append(b[4])
-
-        state = torch.FloatTensor(state).to(self.device)
-        action = torch.LongTensor(action).unsqueeze(1).to(self.device)
-        next_state = torch.FloatTensor(next_state).to(self.device)
-        reward = torch.FloatTensor(reward).to(self.device)
-
-        Q_eval = self.eval_model(state).gather(1, action).reshape([self.param["BATCH_SIZE"]])
+        Q_eval = self.eval_model(state).gather(1, action.long().unsqueeze(1)).reshape([self.param["BATCH_SIZE"]])
         Q_next = self.target_model(next_state).detach()
         Q_target = reward + self.param["GAMMA"]*Q_next.max(1)[0].reshape([self.param["BATCH_SIZE"]])*reward
 
-        loss = self.criterion(Q_eval, Q_target)
+
         self.optimizer.zero_grad()
+        loss = self.criterion(Q_eval, Q_target)
         loss.backward()
         self.optimizer.step()
 
+        if self.step_counter % self.param["UPDATE_MODEL_STEP"] == 0:
+            print("Step ", self.step_counter," : Loss = ", loss)
+
 
 class Buffer:
-    def __init__(self, taille_buffer):
+    def __init__(self, taille_buffer, state_shape, device):
+
+        self.state = torch.empty([taille_buffer,*state_shape]).to(device)
+        self.action = torch.empty([taille_buffer]).to(device)
+        self.next_state = torch.empty([taille_buffer,*state_shape]).to(device)
+        self.reward = torch.empty([taille_buffer]).to(device)
+        self.done = torch.empty([taille_buffer]).to(device)
+
         self.content = []
+
         self.index = 0
         self.taille = taille_buffer
 
     def append(self, o):
-        if self.index < len(self.content):
-            self.content[self.index] = o
-        else:
-            self.content.append(o)
 
-        self.index = (self.index + 1) % self.taille
+        self.state[self.index % self.taille] = torch.FloatTensor(o[0])
+        self.action[self.index % self.taille] = torch.LongTensor([o[1]])
+        self.next_state[self.index % self.taille] = torch.FloatTensor(o[2])
+        self.reward[self.index % self.taille] = torch.FloatTensor([o[3]])
+        self.done[self.index % self.taille] = torch.BoolTensor([o[4]])
+
+        self.index = (self.index + 1)
 
     def get_batch(self, batch_size):
-        return sample(self.content, batch_size)
+        if self.index < self.taille:
+            index = sample([k for k in range(self.index)], batch_size)
+        else:
+            index = sample([k for k in range(self.taille)], batch_size)
+        return self.state[index,:], self.action[index], self.next_state[index,:], self.reward[index], self.done[index]
