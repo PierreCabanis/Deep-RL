@@ -2,9 +2,22 @@ import gym
 import matplotlib.pyplot as plt
 from DeepNet import Net
 import torch
-from time import sleep
-from Buffer import Buffer
-from random import random
+import random
+from numpy.random import seed
+import numpy as np
+from DQN import DQN
+
+param = {
+    "BUFFER_SIZE": 10000,
+    "LR": 1e-2,
+    "TAU": 1,
+    "UPDATE_MODEL_STEP": 1000,
+    "BATCH_SIZE": 64,
+    "GAMMA": 0.9,
+    "N_EPISODE": 5000,
+    "START_TRAIN": 1000
+}
+
 
 def cartpole_random():
     env = gym.make('CartPole-v0')
@@ -24,49 +37,56 @@ def cartpole_random():
     plt.grid()
     plt.show()
 
-def cartpole_NN(epsilon):
+
+def cartpole_NN():
     env = gym.make('CartPole-v0')
     observation_space = env.observation_space.shape[0]
     action_space = env.action_space.n
+    seed(0)
+    random.seed(0)
+    torch.manual_seed(0)
 
-    model = Net(observation_space, action_space)
-    memory = Buffer(100000)
+    dqn = DQN(Net, param, action_space, observation_space)
+    steps = []
 
-    learn_start = 10
-    batch_size = 10
-    tau = 0.5
-
-
-    for episode in range(100):
+    for episode in range(10000):
         observation = env.reset()
-        for t in range(250):
-            env.render()
-            Q = model.forward(torch.Tensor(observation))
-
-            if episode>learn_start:
-                batch = memory.get_batch(batch_size)
-                rewards = torch.tensor([b[3] for b in batch])
-                obs = torch.Tensor([b[0] for b in batch])
-                acts = [b[1] for b in batch]
-
-                Q_train = model.forward(obs)[:,acts]
-                print(Q_train)
-
-            Q = model.forward(torch.Tensor(observation))
-            action = torch.argmax(Q).item()
-
+        done = False
+        steps.append(0)
+        for i in range(100):
+            #env.render()
+            action = dqn.get_action(observation)
             observation_next, reward, done, info = env.step(action)
-            memory.append([observation, action, observation_next, reward, done])
-            observation = observation_next
 
-            if done:
-                if episode>learn_start:
-                    loss = Q_train - rewards
-                print("Episode ", episode+1, ", C'est mort.")
-                break
+            # x, x_dot, theta, theta_dot = observation_next
+            # r1 = (env.x_threshold - abs(x)) / env.x_threshold - 0.8
+            # r2 = (env.theta_threshold_radians - abs(theta)) / env.theta_threshold_radians - 0.5
+            # reward = r1 + r2
+
+            dqn.store(observation, action, observation_next, reward, done)
+            observation = observation_next
+            dqn.learn()
+            steps[-1] += reward
+        if episode %10:
+            plot_evolution(steps)
     env.close()
 
 
+def plot_evolution(data):
+    plt.figure(2)
+    plt.clf()
+    plt.xlabel('Episode')
+    plt.ylabel('Steps')
+    plt.plot(data)
+    plt.grid()
+    ret = np.cumsum(data)
+
+    n = 20
+    ret[n:] = ret[n:] - ret[:-n]
+    plt.plot(ret[n-1:]/n)
+    plt.pause(0.001)  # pause a bit so that plots are updated
+
+
 if __name__ == '__main__':
-    #cartpole_random()
-    cartpole_NN(0.1)
+    # cartpole_random()
+    cartpole_NN()
