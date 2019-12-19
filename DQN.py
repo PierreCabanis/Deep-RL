@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from numpy.random import random, randint
-import torch.nn.functional as F
+import pickle
 from random import sample
 
 
@@ -14,11 +14,18 @@ class DQN:
         self.eval_model = Net().to(self.device)
         self.target_model = Net().to(self.device)
 
+        try :
+            print("Loaded from Memory ! ")
+            self.eval_model.load_state_dict(torch.load("Save/eval_model.data"))
+            self.target_model.load_state_dict(torch.load("Save/eval_model.data"))
+        except:
+            pass
+
         self.param = param
 
         self.memory = Buffer(self.param["BUFFER_SIZE"], state_shape, self.device)
 
-        self.optimizer = torch.optim.RMSprop(self.eval_model.parameters(), lr=self.param["LR"], momentum=0.95, eps=0.01)
+        self.optimizer = torch.optim.Adam(self.eval_model.parameters(), lr=self.param["LR"])
         self.criterion = nn.MSELoss().to(self.device)
 
         self.n_action = n_action
@@ -72,7 +79,7 @@ class DQN:
             print("Step ", self.step_counter," : Loss = ", loss)
 
         if self.param["EPSILON"] > self.param["EPSILON_MIN"]:
-            self.param["EPSILON"] -= self.param["EPSILON_DECAY"]
+            self.param["EPSILON"] *= self.param["EPSILON_DECAY"]
 
 
 class Buffer:
