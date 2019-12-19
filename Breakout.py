@@ -8,20 +8,20 @@ import numpy as np
 from DQN import DQN
 import pickle
 
-
 param = {
     "BUFFER_SIZE": 2000,
     "LR": 1e-3,
     "EPSILON": 0.9,
-    "EPSILON_MIN":0.1,
-    "EPSILON_DECAY" : 0.995,
+    "EPSILON_MIN": 0.1,
+    "EPSILON_DECAY": 0.995,
     "BATCH_SIZE": 32,
     "GAMMA": 0.9,
     "ALPHA": 0.005,
     "N_EPISODE": 1000,
     "N_STEP": 100,
-    "START_TRAIN":1000,
+    "START_TRAIN": 1000,
 }
+
 
 def breakout():
     env = gym.make('BreakoutNoFrameskip-v4')
@@ -32,14 +32,14 @@ def breakout():
     action_space = env.action_space.n
     torch.manual_seed(0)
 
-    dqn = DQN(ConvNet, param, action_space, [4,84,84])
+    dqn = DQN(ConvNet, param, action_space, [4, 84, 84])
     steps = []
     for episode in range(param["N_EPISODE"]):
         observation = env.reset()
         steps.append(0)
         done = False
         while not done:
-            #env.render()
+            # env.render()
             action = dqn.get_action(observation)
             observation_next, reward, done, info = env.step(action)
             dqn.store(observation, action, observation_next, reward, done)
@@ -76,7 +76,7 @@ def plot_evolution(data):
 
     n = 20
     ret[n:] = ret[n:] - ret[:-n]
-    plt.plot(ret[n-1:]/n)
+    plt.plot(ret[n - 1:] / n)
     plt.pause(0.001)  # pause a bit so that plots are updated
 
 
