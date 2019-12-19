@@ -17,7 +17,7 @@ param = {
     "BATCH_SIZE": 32,
     "GAMMA": 0.9,
     "ALPHA": 0.005,
-    "N_EPISODE": 0,
+    "N_EPISODE": 2000,
     "N_STEP": 100,
     "START_TRAIN":1000,
 }
@@ -56,6 +56,7 @@ def cartpole_NN():
 
     for episode in range(param["N_EPISODE"]):
         observation = env.reset()
+        done = False
         steps.append(0)
         for k in range(param["N_STEP"]):
             #env.render()

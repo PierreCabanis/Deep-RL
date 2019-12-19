@@ -15,9 +15,9 @@ class DQN:
         self.target_model = Net().to(self.device)
 
         try :
-            print("Loaded from Memory ! ")
             self.eval_model.load_state_dict(torch.load("Save/eval_model.data"))
             self.target_model.load_state_dict(torch.load("Save/eval_model.data"))
+            print("Loaded from Memory ! ")
         except:
             pass
 

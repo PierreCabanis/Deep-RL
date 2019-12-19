@@ -10,17 +10,17 @@ import pickle
 
 
 param = {
-    "BUFFER_SIZE": 10000,
-    "LR": 25e-4,
-    "EPSILON": 1,
-    "EPSILON_MIN" : 0.1,
-    "EPSILON_DECAY" : 0.9/1000000,
-    "N_STEP": 1000,
+    "BUFFER_SIZE": 2000,
+    "LR": 1e-3,
+    "EPSILON": 0.9,
+    "EPSILON_MIN":0.1,
+    "EPSILON_DECAY" : 0.995,
     "BATCH_SIZE": 32,
-    "GAMMA": 0.99,
-    "ALPHA" : 0.005,
+    "GAMMA": 0.9,
+    "ALPHA": 0.005,
     "N_EPISODE": 1000,
-    "START_TRAIN": 500
+    "N_STEP": 100,
+    "START_TRAIN":1000,
 }
 
 def breakout():
@@ -39,7 +39,7 @@ def breakout():
         steps.append(0)
         done = False
         while not done:
-            env.render()
+            #env.render()
             action = dqn.get_action(observation)
             observation_next, reward, done, info = env.step(action)
             dqn.store(observation, action, observation_next, reward, done)
@@ -47,8 +47,11 @@ def breakout():
             steps[-1] += reward
             dqn.learn()
         print("Episode : ", episode, " : Step : ", steps[-1])
-    pickle.dump(dqn, open("Save/dqn_breakout.data", 'wb'))
-        # plot_evolution(steps)
+        if episode % 50 == 0:
+            print("Saved !")
+            torch.save(dqn.eval_model.state_dict(), "Save/eval_model.data")
+
+    torch.save(dqn.eval_model.state_dict(), "Save/eval_model.data")
 
     observation = env.reset()
     steps.append(0)
