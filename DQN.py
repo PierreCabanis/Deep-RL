@@ -24,8 +24,8 @@ class DQN:
         self.n_action = n_action
         self.step_counter = 0
 
-    def get_action(self, state, top=False):
-        if random() < self.param["EPSILON"] or top:
+    def get_action(self, state, test=False):
+        if random() > self.param["EPSILON"] or test:
             state = torch.FloatTensor(state).to(self.device)
             Q = self.eval_model(state).view([-1])
             action = torch.argmax(Q).item()

@@ -9,14 +9,17 @@ from DQN import DQN
 from time import time
 
 param = {
-    "BUFFER_SIZE": 2000,
-    "LR": 1e-2,
-    "EPSILON": 0.9,
+    "BUFFER_SIZE": 10000,
+    "LR": 25e-4,
+    "EPSILON": 1,
+    "EPSILON_MIN" : 0.1,
+    "EPSILON_DECAY" : 0.9/1000000,
+    "N_STEP": 1000,
     "BATCH_SIZE": 32,
-    "GAMMA": 0.9,
-    "ALPHA": 0.005,
-    "N_EPISODE": 50,
-    "N_STEP": 100,
+    "GAMMA": 0.99,
+    "ALPHA" : 0.005,
+    "N_EPISODE": 100,
+    "START_TRAIN": 500
 }
 
 
@@ -75,7 +78,7 @@ def cartpole_NN():
     done = False
     while not done:
         env.render()
-        action = dqn.get_action(observation, top=True)
+        action = dqn.get_action(observation, test=True)
         observation, reward, done, info = env.step(action)
         steps[-1] += reward
     print(steps[-1])

@@ -10,7 +10,7 @@ import pickle
 
 
 param = {
-    "BUFFER_SIZE": 1000000,
+    "BUFFER_SIZE": 10000,
     "LR": 25e-4,
     "EPSILON": 1,
     "EPSILON_MIN" : 0.1,
@@ -19,8 +19,8 @@ param = {
     "BATCH_SIZE": 32,
     "GAMMA": 0.99,
     "ALPHA" : 0.005,
-    "N_EPISODE": 2,
-    "START_TRAIN": 50000
+    "N_EPISODE": 1000,
+    "START_TRAIN": 500
 }
 
 def breakout():
@@ -46,7 +46,7 @@ def breakout():
             observation = observation_next
             steps[-1] += reward
             dqn.learn()
-
+        print("Episode : ", episode, " : Step : ", steps[-1])
     pickle.dump(dqn, open("Save/dqn_breakout.data", 'wb'))
         # plot_evolution(steps)
 
@@ -55,7 +55,7 @@ def breakout():
     done = False
     while not done:
         env.render()
-        action = dqn.get_action(observation, top=True)
+        action = dqn.get_action(observation, test=True)
         observation, reward, done, info = env.step(action)
         steps[-1] += reward
     print(steps[-1])
