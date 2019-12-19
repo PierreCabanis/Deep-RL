@@ -15,7 +15,7 @@ param = {
     "BATCH_SIZE": 32,
     "GAMMA": 0.9,
     "ALPHA": 0.005,
-    "N_EPISODE": 300,
+    "N_EPISODE": 50,
     "N_STEP": 100,
 }
 
@@ -58,8 +58,9 @@ def cartpole_NN():
             env.render()
             action = dqn.get_action(observation)
             observation_next, reward, done, info = env.step(action)
+            if done:
+                reward = -1
             dqn.store(observation, action, observation_next, reward, done)
-
 
             steps[-1] += reward
             if dqn.memory.index > param["BATCH_SIZE"]:

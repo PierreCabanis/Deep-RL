@@ -18,7 +18,7 @@ class DQN:
 
         self.memory = Buffer(self.param["BUFFER_SIZE"], state_shape, self.device)
 
-        self.optimizer = torch.optim.Adam(self.eval_model.parameters(), lr=self.param["LR"])
+        self.optimizer = torch.optim.RMSprop(self.eval_model.parameters(), lr=self.param["LR"], momentum=0.95, eps=0.01)
         self.criterion = nn.MSELoss().to(self.device)
 
         self.n_action = n_action
@@ -33,7 +33,6 @@ class DQN:
         else:
             action = randint(0, self.n_action)
             return action
-
         # proba = F.softmax(Q / self.param["TAU"], dim=0).detach()
         #
         # proba = proba.cpu().numpy().round(2)
@@ -47,6 +46,9 @@ class DQN:
 
     def learn(self):
         self.step_counter += 1
+
+        if self.step_counter < self.param["START_TRAIN"]:
+            return
 
         eval_dict = self.eval_model.state_dict()
         target_dict = self.eval_model.state_dict()
@@ -68,6 +70,9 @@ class DQN:
 
         if self.step_counter % 1000 == 0:
             print("Step ", self.step_counter," : Loss = ", loss)
+
+        if self.param["EPSILON"] > self.param["EPSILON_MIN"]:
+            self.param["EPSILON"] -= self.param["EPSILON_DECAY"]
 
 
 class Buffer:
