@@ -9,14 +9,14 @@ from DQN import DQN
 from time import time
 
 param = {
-    "BUFFER_SIZE": 10000,
+    "BUFFER_SIZE": 2000,
     "LR": 1e-2,
-    "TAU": 1,
-    "UPDATE_MODEL_STEP": 1000,
-    "BATCH_SIZE": 64,
+    "EPSILON": 0.9,
+    "BATCH_SIZE": 32,
     "GAMMA": 0.9,
-    "N_EPISODE": 5000,
-    "START_TRAIN": 1000
+    "ALPHA": 0.005,
+    "N_EPISODE": 300,
+    "N_STEP": 100,
 }
 
 
@@ -40,7 +40,8 @@ def cartpole_random():
 
 
 def cartpole_NN():
-    env = gym.make('CartPole-v0')
+    env = gym.make('CartPole-v1')
+    env = env.unwrapped
     observation_space = env.observation_space.shape[0]
     action_space = env.action_space.n
     seed(0)
@@ -50,24 +51,33 @@ def cartpole_NN():
     dqn = DQN(Net, param, action_space, [observation_space], cuda=False)
     steps = []
 
-    for episode in range(10000):
+    for episode in range(param["N_EPISODE"]):
         observation = env.reset()
-        done = False
         steps.append(0)
-        t = time()
-        for i in range(100):
-            #env.render()
+        for k in range(param["N_STEP"]):
+            env.render()
             action = dqn.get_action(observation)
             observation_next, reward, done, info = env.step(action)
-
             dqn.store(observation, action, observation_next, reward, done)
 
-            observation = observation_next
-            dqn.learn()
+
             steps[-1] += reward
-        print('T : ', time() - t)
-        if episode %10:
-            plot_evolution(steps)
+            if dqn.memory.index > param["BATCH_SIZE"]:
+                dqn.learn()
+
+            observation = observation_next
+        print("Episode : ", episode, " | Steps : ", steps[-1])
+        plot_evolution(steps)
+
+    observation = env.reset()
+    steps.append(0)
+    done = False
+    while not done:
+        env.render()
+        action = dqn.get_action(observation, top=True)
+        observation, reward, done, info = env.step(action)
+        steps[-1] += reward
+    print(steps[-1])
     env.close()
 
 

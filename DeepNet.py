@@ -6,8 +6,8 @@ import torch.nn.functional as F
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(4, 256)
-        self.fc2 = nn.Linear(256, 2)
+        self.fc1 = nn.Linear(4, 50)
+        self.fc2 = nn.Linear(50, 2)
 
     def forward(self, x):
         x = self.fc1(x)

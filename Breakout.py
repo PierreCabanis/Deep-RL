@@ -14,10 +14,11 @@ from DQN import DQN
 param = {
     "BUFFER_SIZE": 10000,
     "LR": 1e-2,
-    "TAU": 1,
-    "UPDATE_MODEL_STEP": 500,
+    "EPSILON": 0.9,
+    "N_STEP": 1000,
     "BATCH_SIZE": 64,
     "GAMMA": 0.9,
+    "ALPHA" : 0.005,
     "N_EPISODE": 5000,
     "START_TRAIN": 1000
 }
@@ -35,23 +36,32 @@ def breakout():
 
     dqn = DQN(ConvNet, param, action_space, [4,84,84])
     steps = []
-    T = []
-    for episode in range(10000):
+    for episode in range(param["N_EPISODE"]):
         observation = env.reset()
         steps.append(0)
         done = False
         t = time()
         while not done:
-            env.render()
+            #env.render()
             action = dqn.get_action(observation)
             observation_next, reward, done, info = env.step(action)
             dqn.store(observation, action, observation_next, reward, done)
             observation = observation_next
             steps[-1] += reward
-            dqn.learn()
-        T.append(time() - t)
-        print("T : ", np.mean(T))
+            if dqn.memory.index > param["BATCH_SIZE"]:
+                dqn.learn()
+
         plot_evolution(steps)
+
+    observation = env.reset()
+    steps.append(0)
+    done = False
+    while not done:
+        env.render()
+        action = dqn.get_action(observation, top=True)
+        observation, reward, done, info = env.step(action)
+        steps[-1] += reward
+    print(steps[-1])
     env.close()
 
 def plot_evolution(data):
