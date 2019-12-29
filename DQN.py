@@ -14,6 +14,7 @@ class DQN:
         self.eval_model = Net().to(self.device)
         self.target_model = Net().to(self.device)
 
+        # Chargement des données si elle existe
         try:
             self.eval_model.load_state_dict(torch.load("Save/eval_model.data"))
             self.target_model.load_state_dict(torch.load("Save/eval_model.data"))
@@ -22,9 +23,7 @@ class DQN:
             pass
 
         self.param = param
-
         self.memory = Buffer(self.param["BUFFER_SIZE"], state_shape, self.device)
-
         self.optimizer = torch.optim.Adam(self.eval_model.parameters(), lr=self.param["LR"])
         self.criterion = nn.MSELoss().to(self.device)
 

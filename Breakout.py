@@ -1,12 +1,13 @@
 import gym
 import matplotlib.pyplot as plt
-from DeepNet import ConvNet
 import torch
+import numpy as np
+
 from gym.wrappers.atari_preprocessing import AtariPreprocessing
 from gym.wrappers.frame_stack import FrameStack
-import numpy as np
+
 from DQN import DQN
-import pickle
+from DeepNet import ConvNet
 
 param = {
     "BUFFER_SIZE": 2000,
@@ -24,6 +25,7 @@ param = {
 
 
 def breakout():
+    # Create environment
     env = gym.make('BreakoutNoFrameskip-v4')
     # Wrappers
     env = AtariPreprocessing(env, scale_obs=True)
@@ -33,6 +35,7 @@ def breakout():
     torch.manual_seed(0)
 
     dqn = DQN(ConvNet, param, action_space, [4, 84, 84])
+
     steps = []
     for episode in range(param["N_EPISODE"]):
         observation = env.reset()
