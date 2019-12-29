@@ -24,22 +24,23 @@ param = {
 
 
 def cartpole_random():
-    env = gym.make('CartPole-v0')
-
+    env = gym.make('CartPole-v0')  # Création de l'environnement
     env.reset()
     rewards = []
-    for t in range(250):
-        env.render()
-        action = env.action_space.sample()
-        observation, reward, done, info = env.step(action)
+    n = 100
+    for t in range(n):
+        env.render()  # Affichage
+        action = env.action_space.sample()  # Choisis une action aléatoire
+        observation, reward, done, info = env.step(action)  # Jouer l'action
         rewards.append(reward)
 
     plt.ylabel("Rewards")
     plt.xlabel("Nb interactions")
     plt.plot(rewards)
-    env.close()
     plt.grid()
     plt.show()
+
+    env.close()
 
 
 def cartpole_NN():
