@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -19,18 +18,22 @@ class Net(nn.Module):
 class ConvNet(nn.Module):
     def __init__(self):
         super(ConvNet, self).__init__()
-        self.cv1 = nn.Conv2d(4, 32, 8, 4)
-        self.cv2 = nn.Conv2d(32, 64, 4, 2)
-        self.fc1 = nn.Linear(5184, 512)
-        self.fc2 = nn.Linear(512, 4)
+        self.features = nn.Sequential(
+            nn.Conv2d(4, 32, 8, 4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, 4, 2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, 3, 1),
+            nn.ReLU(),
+        )
+        self.classifier = nn.Sequential(
+            nn.Dropout(),
+            nn.Linear(3136, 512),
+            nn.ReLU(),
+            nn.Linear(512, 4)
+        )
 
     def forward(self, x):
-        x = self.cv1(x.reshape([-1, 4, 84, 84]))
-        x = F.relu(x)
-        x = self.cv2(x)
-        x = F.relu(x)
-
-        x = self.fc1(x.view(x.size(0), -1))
-        x = F.relu(x)
-        x = self.fc2(x)
+        x = self.features(x.reshape([-1, 4, 84, 84]))
+        x = self.classifier(x.view(x.size(0), -1))
         return x

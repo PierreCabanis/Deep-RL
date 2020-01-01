@@ -6,62 +6,128 @@ from gym.wrappers.atari_preprocessing import AtariPreprocessing
 from gym.wrappers.frame_stack import FrameStack
 import numpy as np
 from DQN import DQN
-import pickle
+
+torch.manual_seed(0)
+FIRE = 1
+
+config = {
+    "TEST_MODE": True,     # Désactive l'entrainement et teste directement le réseau sauvegardé
+    "DUELING_DQN": False,   # Active le dueling DQN
+    "DOUBLE_DQN": True,     # Active le double DQN
+    "BOLTZMANN": False,     # Exploration boltzmann (True), epsilon-greedy (False)
+    "PLOTTING": False,      # Affichage du reward temps réel (lent)
+    "RENDERING": False,     # Active l'affichage de l'env en temps réel (lent)
+    "SAVE": False,          # Active la sauvegarde du DQN
+    "SAVE_LOC": "eval_model.data",  # Nom du fichier de sauvegarde
+    "N_TEST": 10             # Nombre de tests à réaliser (moyenne des récompenses)
+}
 
 param = {
-    "BUFFER_SIZE": 2000,
-    "LR": 1e-3,
-    "EPSILON": 0.9,
-    "EPSILON_MIN": 0.1,
-    "EPSILON_DECAY": 0.995,
-    "BATCH_SIZE": 32,
-    "GAMMA": 0.9,
-    "ALPHA": 0.005,
-    "N_EPISODE": 1000,
-    "N_STEP": 100,
-    "START_TRAIN": 1000,
+    "BUFFER_SIZE": 2000,          # Taille de la mémoire
+    "LR": 0.00025,                # Learning Rate
+    "EPSILON": 1,                 # Paramètre pour epsilon greedy
+    "EPSILON_MIN": 0.1,           # Epsilon min pour le decay
+    "EPSILON_DECAY": 0.9999,      # epsilon = epsilon*epsilon_decay à chaque step
+    "TAU": 1,                     # Parametre pour exploration Boltzmann
+    "BATCH_SIZE": 32,             # Taille du Batch
+    "GAMMA": 0.99,                # Paramètre prise en compte récompense
+    "ALPHA": 0.005,               # Pour le double DQN
+    "N_EPISODE": 1000,            # Nombre d'épisodes d'entrainements
+    "N_STEP": 100,                # Nombre de step par épisode (Cartpool uniquement)
+    "START_TRAIN": 1000,          # Démarre l'apprentissage après le nb de step
 }
 
 
-def breakout():
-    env = gym.make('BreakoutNoFrameskip-v4')
-    # Wrappers
-    env = AtariPreprocessing(env, scale_obs=True)
-    env = FrameStack(env, 4)
-
-    action_space = env.action_space.n
-    torch.manual_seed(0)
-
-    dqn = DQN(ConvNet, param, action_space, [4, 84, 84])
-    steps = []
-    for episode in range(param["N_EPISODE"]):
-        observation = env.reset()
-        steps.append(0)
-        done = False
-        while not done:
-            # env.render()
-            action = dqn.get_action(observation)
-            observation_next, reward, done, info = env.step(action)
-            dqn.store(observation, action, observation_next, reward, done)
-            observation = observation_next
-            steps[-1] += reward
-            dqn.learn()
-        print("Episode : ", episode, " : Step : ", steps[-1])
-        if episode % 50 == 0:
-            print("Saved !")
-            torch.save(dqn.eval_model.state_dict(), "Save/eval_model.data")
-
-    torch.save(dqn.eval_model.state_dict(), "Save/eval_model.data")
-
+def test(env, dqn):
+    """Lance un épisode en utilisant le dqn passé en paramètre et renvoie le score obtenu"""
     observation = env.reset()
-    steps.append(0)
+    score = 0
     done = False
+    env.step(FIRE)  # Fire at start
+    lives = 5
     while not done:
         env.render()
         action = dqn.get_action(observation, test=True)
         observation, reward, done, info = env.step(action)
-        steps[-1] += reward
-    print(steps[-1])
+        score += reward
+        if env.env.ale.lives() != lives:
+            lives -= 1
+            env.step(FIRE)  # Fire at start
+    return score
+
+
+def train(env, dqn):
+    observation = env.reset()
+    score = 0
+    done = False
+    env.step(FIRE)
+    lives = 5
+
+    # Tant que la partie n'est pas terminé
+    while not done:
+
+        if config["RENDERING"]: env.render()
+
+        action = dqn.get_action(observation)
+        observation_next, reward, done, info = env.step(action)
+
+        if env.env.ale.lives() != lives:  # Perd une vie
+            lives -= 1
+            reward = -10
+            env.step(FIRE)  # Relance la balle
+
+        dqn.store(observation, action, observation_next, reward, done)
+        observation = observation_next
+
+        score += reward
+        dqn.learn()
+
+    return score, dqn
+
+
+def breakout():
+    """Lance l'entrainement ou/et le test d'un DQN selon la configuration sélectionnée"""
+
+    # Création de l'environnement + Wrappers
+    env = gym.make('BreakoutNoFrameskip-v4')
+    env = AtariPreprocessing(env, scale_obs=True)
+    env = FrameStack(env, 4)
+
+    # Création du DQN
+    dqn = DQN(Net=ConvNet,
+              param=param,
+              config=config,
+              n_action=env.action_space.n,
+              state_shape=[4, 84, 84])
+
+    # Boucle sur n episode
+    scores_list = []
+    if not config["TEST_MODE"]:
+        for episode in range(param["N_EPISODE"]):
+
+            score, dqn = train(env, dqn)
+
+            scores_list.append(score)
+            print("Episode : ", episode, " : Step : ", scores_list[-1])
+
+            if episode % 20 == 0 and config["SAVE"]:   # Sauvegarde du DQN
+                print("Saved !")
+                torch.save(dqn.eval_model.state_dict(), "Save/"+config["SAVE_LOC"])
+
+            if config["PLOTTING"]: plot_evolution(scores_list)
+
+    # Sauvegarde du DQN
+    if config["SAVE"]: torch.save(dqn.eval_model.state_dict(), "Save/"+config["SAVE_LOC"])
+
+    # Phase de test
+    score = []
+    for k in range(config["N_TEST"]):
+        s = test(env, dqn)
+        score.append(s)
+        print("Test Episode ", k+1, " : ", s)
+
+    print("AVG : ", np.mean(score))
+    print("STD : ", np.std(score))
     env.close()
 
 

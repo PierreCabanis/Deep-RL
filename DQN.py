@@ -1,52 +1,66 @@
 import torch
 import torch.nn as nn
 from numpy.random import random, randint
-import pickle
+import torch.nn.functional as F
+from numpy.random import choice
 from random import sample
 
 
 class DQN:
-    def __init__(self, Net, param, n_action, state_shape, cuda=True):
-        use_cuda = torch.cuda.is_available() and cuda
+    def __init__(self, Net, param, config, n_action, state_shape):
+        use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if use_cuda else "cpu")
 
         # Création des NN d'éval et de target
         self.eval_model = Net().to(self.device)
         self.target_model = Net().to(self.device)
 
+        # Tente de charger les poids depuis une sauvegarde
         try:
-            self.eval_model.load_state_dict(torch.load("Save/eval_model.data"))
-            self.target_model.load_state_dict(torch.load("Save/eval_model.data"))
+            self.eval_model.load_state_dict(torch.load("Save/" + config["SAVE_LOC"]))
+            self.target_model.load_state_dict(torch.load("Save/" + config["SAVE_LOC"]))
             print("Loaded from Memory ! ")
         except:
             pass
 
         self.param = param
+        self.config = config
 
         self.memory = Buffer(self.param["BUFFER_SIZE"], state_shape, self.device)
 
-        self.optimizer = torch.optim.Adam(self.eval_model.parameters(), lr=self.param["LR"])
+        if self.config["DOUBLE_DQN"]:
+            self.optimizer = torch.optim.Adam(self.eval_model.parameters(),
+                                              lr=self.param["LR"], )
+        else:
+            self.optimizer = torch.optim.Adam(self.target_model.parameters(),
+                                              lr=self.param["LR"], )
+
         self.criterion = nn.MSELoss().to(self.device)
 
         self.n_action = n_action
         self.step_counter = 0
 
     def get_action(self, state, test=False):
-        if random() > self.param["EPSILON"] or test:
-            state = torch.FloatTensor(state).to(self.device)
-            Q = self.eval_model(state).view([-1])
+        self.target_model.eval()
+        state = torch.FloatTensor(state).to(self.device)
+        Q = self.target_model(state).view([-1])
+
+        if test:
             action = torch.argmax(Q).item()
-            return action
+
+        elif self.config["BOLTZMANN"]:
+            proba = F.softmax(Q / self.param["TAU"], dim=0).detach()
+            proba = proba.cpu().numpy().round(2)
+            proba /= proba.sum()
+            action = choice([k for k in range(self.n_action)], p=proba)
         else:
-            action = randint(0, self.n_action)
-            return action
-        # proba = F.softmax(Q / self.param["TAU"], dim=0).detach()
-        #
-        # proba = proba.cpu().numpy().round(2)
-        # proba /= proba.sum()
-        # action = choice([k for k in range(self.n_action)], p=proba)
-        #
-        # return action
+            if random() > self.param["EPSILON"] or test:
+                action = torch.argmax(Q).item()
+            else:
+                action = randint(0, self.n_action)
+
+        self.target_model.train()
+        return action
 
     def store(self, state, action, next_state, reward, done):
         self.memory.append([state, action, next_state, reward, done])
@@ -57,18 +71,25 @@ class DQN:
         if self.step_counter < self.param["START_TRAIN"]:
             return
 
-        eval_dict = self.eval_model.state_dict()
-        target_dict = self.eval_model.state_dict()
-
-        for weights in eval_dict:
-            target_dict[weights] = (1 - self.param['ALPHA']) * target_dict[weights] + self.param['ALPHA'] * eval_dict[
-                weights]
-            self.target_model.load_state_dict(target_dict)
-
         state, action, next_state, reward, done = self.memory.get_batch(self.param["BATCH_SIZE"])
 
-        Q_eval = self.eval_model(state).gather(1, action.long().unsqueeze(1)).reshape([self.param["BATCH_SIZE"]])
+        if self.config["DOUBLE_DQN"]:
+            eval_dict = self.eval_model.state_dict()
+            target_dict = self.eval_model.state_dict()
+
+            for weights in eval_dict:
+                target_dict[weights] = (1 - self.param['ALPHA']) * target_dict[weights] + self.param['ALPHA'] * eval_dict[
+                    weights]
+                self.target_model.load_state_dict(target_dict)
+
+            Q_eval = self.eval_model(state).gather(1, action.long().unsqueeze(1))
+
+        else:
+            Q_eval = self.target_model(state).gather(1, action.long().unsqueeze(1))
+
+        Q_eval = Q_eval.reshape([self.param["BATCH_SIZE"]])
         Q_next = self.target_model(next_state).detach()
+
         Q_target = reward + self.param["GAMMA"] * Q_next.max(1)[0].reshape([self.param["BATCH_SIZE"]])  # "*reward
 
         self.optimizer.zero_grad()
@@ -77,7 +98,7 @@ class DQN:
         self.optimizer.step()
 
         if self.step_counter % 1000 == 0:
-            print("Step ", self.step_counter, " : Loss = ", loss)
+            print("Step ", self.step_counter, " : Loss = ", loss, ", Epsilon : ", self.param["EPSILON"])
 
         if self.param["EPSILON"] > self.param["EPSILON_MIN"]:
             self.param["EPSILON"] *= self.param["EPSILON_DECAY"]
