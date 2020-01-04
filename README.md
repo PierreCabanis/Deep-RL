@@ -29,9 +29,4 @@ Voir la partie Description ci-dessous.
 
 ## Description
 
-Voir le [Rapport](Rapport.pdf) pour les détails des principes utilisés et des résultats sur différentes parties.
-
-### Partie 1 : Deep Q-network sur CartPole
-
-### Partie 2 : Breakout Atari
-
+Voir le [Rapport](CR_DeepRL.pdf) pour les détails des principes utilisés et des résultats sur différentes parties.
