@@ -12,8 +12,8 @@ class DQN:
         self.device = torch.device("cuda" if use_cuda else "cpu")
 
         # Création des NN d'éval et de target
-        self.eval_model = Net().to(self.device)
-        self.target_model = Net().to(self.device)
+        self.eval_model = Net(n_action).to(self.device)
+        self.target_model = Net(n_action).to(self.device)
 
         # Tente de charger les poids depuis une sauvegarde
         try:
@@ -28,6 +28,7 @@ class DQN:
 
         self.memory = Buffer(self.param["BUFFER_SIZE"], state_shape, self.device)
 
+        # Optimizer selon le mode Double DQN ou pas
         if self.config["DOUBLE_DQN"]:
             self.optimizer = torch.optim.Adam(self.eval_model.parameters(),
                                               lr=self.param["LR"], )
@@ -35,24 +36,32 @@ class DQN:
             self.optimizer = torch.optim.Adam(self.target_model.parameters(),
                                               lr=self.param["LR"], )
 
+        # Critère moindre carrés
         self.criterion = nn.MSELoss().to(self.device)
 
         self.n_action = n_action
         self.step_counter = 0
 
     def get_action(self, state, test=False):
+        """Renvoie une action selon la politique d'exploration choisie
+        Renvoie la meilleure action selon le NN si test=True"""
+
         self.target_model.eval()
         state = torch.FloatTensor(state).to(self.device)
         Q = self.target_model(state).view([-1])
 
+        # PHASE DE TEST
         if test:
             action = torch.argmax(Q).item()
 
+        # EXPLORATION BOLTZMANN
         elif self.config["BOLTZMANN"]:
             proba = F.softmax(Q / self.param["TAU"], dim=0).detach()
             proba = proba.cpu().numpy().round(2)
             proba /= proba.sum()
             action = choice([k for k in range(self.n_action)], p=proba)
+
+        # EPSILON-GREEDY
         else:
             if random() > self.param["EPSILON"] or test:
                 action = torch.argmax(Q).item()
@@ -63,50 +72,58 @@ class DQN:
         return action
 
     def store(self, state, action, next_state, reward, done):
+        """Enregistre une expérience dans la mémoire de l'agent"""
         self.memory.append([state, action, next_state, reward, done])
 
     def learn(self):
+        """Execute une step d'apprentissage"""
         self.step_counter += 1
 
         if self.step_counter < self.param["START_TRAIN"]:
-            return
+            return  # Attend que la mémoire soit suffisament remplie pour commencer
 
+        # Mini- batch
         state, action, next_state, reward, done = self.memory.get_batch(self.param["BATCH_SIZE"])
 
+        # MODE DOUBLE DQN
         if self.config["DOUBLE_DQN"]:
+            # Evolution lente des poids
             eval_dict = self.eval_model.state_dict()
             target_dict = self.eval_model.state_dict()
-
             for weights in eval_dict:
                 target_dict[weights] = (1 - self.param['ALPHA']) * target_dict[weights] + self.param['ALPHA'] * eval_dict[
                     weights]
                 self.target_model.load_state_dict(target_dict)
 
+            # Q valeurs d'évaluations
             Q_eval = self.eval_model(state).gather(1, action.long().unsqueeze(1))
 
+        # MODE DQN SIMPLE
         else:
             Q_eval = self.target_model(state).gather(1, action.long().unsqueeze(1))
 
+        # Calcul de la target
         Q_eval = Q_eval.reshape([self.param["BATCH_SIZE"]])
         Q_next = self.target_model(next_state).detach()
-
         Q_target = reward + self.param["GAMMA"] * Q_next.max(1)[0].reshape([self.param["BATCH_SIZE"]])  # "*reward
 
+        # Optimization
         self.optimizer.zero_grad()
         loss = self.criterion(Q_eval, Q_target)
         loss.backward()
         self.optimizer.step()
 
+        # LOG
         if self.step_counter % 1000 == 0:
             print("Step ", self.step_counter, " : Loss = ", loss, ", Epsilon : ", self.param["EPSILON"])
 
+        # EPSILON DECAY
         if self.param["EPSILON"] > self.param["EPSILON_MIN"]:
             self.param["EPSILON"] *= self.param["EPSILON_DECAY"]
 
 
 class Buffer:
     def __init__(self, taille_buffer, state_shape, device):
-
         self.state = torch.empty([taille_buffer, *state_shape]).to(device)
         self.action = torch.empty([taille_buffer]).to(device)
         self.next_state = torch.empty([taille_buffer, *state_shape]).to(device)

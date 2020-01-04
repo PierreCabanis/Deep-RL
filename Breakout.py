@@ -1,6 +1,6 @@
 import gym
 import matplotlib.pyplot as plt
-from DeepNet import ConvNet
+from DeepNet import ConvNet, Net_Dueling
 import torch
 from gym.wrappers.atari_preprocessing import AtariPreprocessing
 from gym.wrappers.frame_stack import FrameStack
@@ -47,12 +47,15 @@ def test(env, dqn):
     lives = 5
     while not done:
         env.render()
+
         action = dqn.get_action(observation, test=True)
         observation, reward, done, info = env.step(action)
         score += reward
+
         if env.env.ale.lives() != lives:
             lives -= 1
             env.step(FIRE)  # Fire at start
+
     return score
 
 
@@ -94,11 +97,18 @@ def breakout():
     env = FrameStack(env, 4)
 
     # Création du DQN
-    dqn = DQN(Net=ConvNet,
-              param=param,
-              config=config,
-              n_action=env.action_space.n,
-              state_shape=[4, 84, 84])
+    if config["DUELING_DQN"]:
+        dqn = DQN(Net=Net_Dueling,
+                  param=param,
+                  config=config,
+                  n_action=env.action_space.n,
+                  state_shape=[4, 84, 84])
+    else:
+        dqn = DQN(Net=ConvNet,
+                  param=param,
+                  config=config,
+                  n_action=env.action_space.n,
+                  state_shape=[4, 84, 84])
 
     # Boucle sur n episode
     scores_list = []
@@ -138,12 +148,7 @@ def plot_evolution(data):
     plt.ylabel('Steps')
     plt.plot(data)
     plt.grid()
-    ret = np.cumsum(data)
-
-    n = 20
-    ret[n:] = ret[n:] - ret[:-n]
-    plt.plot(ret[n - 1:] / n)
-    plt.pause(0.001)  # pause a bit so that plots are updated
+    plt.pause(0.001)
 
 
 if __name__ == '__main__':
