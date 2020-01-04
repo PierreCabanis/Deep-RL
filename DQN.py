@@ -17,8 +17,8 @@ class DQN:
 
         # Tente de charger les poids depuis une sauvegarde
         try:
-            self.eval_model.load_state_dict(torch.load("Save/" + config["SAVE_LOC"]))
-            self.target_model.load_state_dict(torch.load("Save/" + config["SAVE_LOC"]))
+            self.eval_model.load_state_dict(torch.load("Save/" + config["SAVE_LOC"], map_location=self.device))
+            self.target_model.load_state_dict(torch.load("Save/" + config["SAVE_LOC"], map_location=self.device))
             print("Loaded from Memory ! ")
         except:
             pass
