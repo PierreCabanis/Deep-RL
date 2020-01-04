@@ -1,6 +1,6 @@
 import gym
 import matplotlib.pyplot as plt
-from DeepNet import ConvNet, Net_Dueling
+from DeepNet import ConvNet
 import torch
 from gym.wrappers.atari_preprocessing import AtariPreprocessing
 from gym.wrappers.frame_stack import FrameStack
