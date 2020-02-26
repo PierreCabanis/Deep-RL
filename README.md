@@ -4,13 +4,13 @@
 
 ### Prérequis :
 
+Pour l'environnement complet : [requirements.txt](requirements.txt)
+
 [Python 3.7]
 
 [PyTorch] https://pytorch.org/
 
 [Gym] https://gym.openai.com/
-
-(Ajouter l'environnement)
 
 ### Nos fichiers :
 
