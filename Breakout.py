@@ -4,6 +4,7 @@ from DeepNet import ConvNet
 import torch
 from gym.wrappers.atari_preprocessing import AtariPreprocessing
 from gym.wrappers.frame_stack import FrameStack
+from gym.wrappers import Monitor
 import numpy as np
 from DQN import DQN
 
@@ -19,7 +20,7 @@ config = {
     "RENDERING": False,     # Active l'affichage de l'env en temps réel (lent)
     "SAVE": False,          # Active la sauvegarde du DQN
     "SAVE_LOC": "eval_model.data",  # Nom du fichier de sauvegarde
-    "N_TEST": 10             # Nombre de tests à réaliser (moyenne des récompenses)
+    "N_TEST": 1             # Nombre de tests à réaliser (moyenne des récompenses)
 }
 
 param = {
@@ -95,6 +96,7 @@ def breakout():
     env = gym.make('BreakoutNoFrameskip-v4')
     env = AtariPreprocessing(env, scale_obs=True)
     env = FrameStack(env, 4)
+    env = Monitor(env, directory="Save")
 
     # Création du DQN
     if config["DUELING_DQN"]:
@@ -109,7 +111,6 @@ def breakout():
                   config=config,
                   n_action=env.action_space.n,
                   state_shape=[4, 84, 84])
-
     # Boucle sur n episode
     scores_list = []
     if not config["TEST_MODE"]:
